@@ -1,0 +1,327 @@
+const { supabase } = require('../utils/database');
+
+// const createSession = async (req, res) => {
+//   try {
+//     const { course_id } = req.body;
+//     const adminId = req.adminId;
+
+//     if (!course_id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Course ID is required',
+//       });
+//     }
+
+//     // Create timestamps WITHOUT converting to ISO string
+//     const now = new Date();
+//     const expiresAt = new Date(now.getTime() + 60 * 60 * 1000); // Add 1 hour
+
+//     console.log('Creating session:');
+//     console.log('  Started At:', now);
+//     console.log('  Expires At:', expiresAt);
+//     console.log('  Admin ID:', adminId);
+//     console.log('  Course ID:', course_id);
+
+//     const { data: session, error } = await supabase
+//       .from('attendance_sessions')
+//       .insert([
+//         {
+//           course_id,
+//           admin_id: adminId,
+//           started_at: now, // Send Date object, not ISO string
+//           expires_at: expiresAt, // Send Date object, not ISO string
+//           status: 'active',
+//         },
+//       ])
+//       .select()
+//       .single();
+
+//     if (error) {
+//       console.error('Insert error:', error);
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Failed to create session',
+//         error: error.message,
+//       });
+//     }
+
+//     console.log('Session created successfully:', session);
+
+//     res.json({
+//       success: true,
+//       message: 'Session created',
+//       data: session,
+//     });
+//   } catch (error) {
+//     console.error('Create session error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server error',
+//       error: String(error),
+//     });
+//   }
+// };
+
+const createSession = async (req, res) => {
+  try {
+    const { course_id } = req.body;
+    const adminId = req.adminId;
+
+    if (!course_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Course ID is required',
+      });
+    }
+
+    // Create timestamps and add 1 hour
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 60 * 60 * 1000);
+
+    // Convert to ISO strings for storage
+    const startedAtISO = now.toISOString();
+    const expiresAtISO = expiresAt.toISOString();
+
+    console.log('Creating session:');
+    console.log('  Started At:', startedAtISO);
+    console.log('  Expires At:', expiresAtISO);
+
+    const { data: session, error } = await supabase
+      .from('attendance_sessions')
+      .insert([
+        {
+          course_id,
+          admin_id: adminId,
+          started_at: startedAtISO,
+          expires_at: expiresAtISO,
+          status: 'active',
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Insert error:', error);
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to create session',
+        error: error.message,
+      });
+    }
+
+    console.log('Session created successfully:', session);
+
+    res.json({
+      success: true,
+      message: 'Session created',
+      data: session,
+    });
+  } catch (error) {
+    console.error('Create session error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: String(error),
+    });
+  }
+};
+
+// const getActiveSessions = async (req, res) => {
+//   try {
+//     const adminId = req.adminId;
+
+//     const { data: sessions, error } = await supabase
+//       .from('attendance_sessions')
+//       .select(`
+//         *,
+//         courses (id, course_code, course_name)
+//       `)
+//       .eq('admin_id', adminId)
+//       .eq('status', 'active')
+//       .order('started_at', { ascending: false });
+
+//     if (error) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Failed to fetch sessions',
+//         error: error.message,
+//       });
+//     }
+
+//     res.json({
+//       success: true,
+//       message: 'Sessions fetched',
+//       data: sessions,
+//     });
+//   } catch (error) {
+//     console.error('Get sessions error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server error',
+//       error: String(error),
+//     });
+//   }
+// };
+
+const getActiveSessions = async (req, res) => {
+  try {
+    const adminId = req.adminId;
+
+    console.log('Fetching active sessions for admin:', adminId);
+
+    const { data: sessions, error } = await supabase
+      .from('attendance_sessions')
+      .select(`
+        *,
+        courses (id, course_code, course_name)
+      `)
+      .eq('admin_id', adminId)
+      .eq('status', 'active')
+      .order('started_at', { ascending: false });
+
+    if (error) {
+      console.error('Database error:', error);
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to fetch sessions',
+        error: error.message,
+      });
+    }
+
+    console.log('Sessions found:', sessions);
+
+    res.json({
+      success: true,
+      message: 'Sessions fetched',
+      data: sessions || [],
+    });
+  } catch (error) {
+    console.error('Get sessions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: String(error),
+    });
+  }
+};
+
+const endSession = async (req, res) => {
+  try {
+    const { session_id } = req.body;
+
+    if (!session_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID is required',
+      });
+    }
+
+    const { data: session, error } = await supabase
+      .from('attendance_sessions')
+      .update({ status: 'ended' })
+      .eq('id', session_id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to end session',
+        error: error.message,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Session ended',
+      data: session,
+    });
+  } catch (error) {
+    console.error('End session error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: String(error),
+    });
+  }
+};
+
+// const getPublicActiveSessions = async (req, res) => {
+//   try {
+//     const now = new Date();
+    
+//     const { data: sessions, error } = await supabase
+//       .from('attendance_sessions')
+//       .select(`
+//         *,
+//         courses (id, course_code, course_name)
+//       `)
+//       .eq('status', 'active')
+//       .gt('expires_at', now) // Compare with Date object, not ISO string
+//       .order('started_at', { ascending: false });
+
+//     if (error) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Failed to fetch sessions',
+//         error: error.message,
+//       });
+//     }
+
+//     res.json({
+//       success: true,
+//       message: 'Active sessions fetched',
+//       data: sessions || [],
+//     });
+//   } catch (error) {
+//     console.error('Get public sessions error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server error',
+//       error: String(error),
+//     });
+//   }
+// };
+
+const getPublicActiveSessions = async (req, res) => {
+  try {
+    // Get current time in ISO format that PostgreSQL understands
+    const now = new Date().toISOString();
+    
+    const { data: sessions, error } = await supabase
+      .from('attendance_sessions')
+      .select(`
+        *,
+        courses (id, course_code, course_name)
+      `)
+      .eq('status', 'active')
+      .gt('expires_at', now) // Use ISO string format
+      .order('started_at', { ascending: false });
+
+    if (error) {
+      console.error('Query error:', error);
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to fetch sessions',
+        error: error.message,
+      });
+    }
+
+    console.log('Active sessions found:', sessions);
+
+    res.json({
+      success: true,
+      message: 'Active sessions fetched',
+      data: sessions || [],
+    });
+  } catch (error) {
+    console.error('Get public sessions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: String(error),
+    });
+  }
+};
+
+module.exports = { createSession, getActiveSessions, endSession, getPublicActiveSessions };

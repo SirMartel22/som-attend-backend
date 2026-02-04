@@ -7,6 +7,8 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const sessionRoutes = require('./routes/sessions');
 const attendanceRoutes = require('./routes/attendance');
+const courseRoutes = require('./routes/courses'); 
+const archiveRoutes = require('./routes/archives');
 
 const app = express();
 const server = http.createServer(app);
@@ -34,6 +36,8 @@ app.set('io', io);
 app.use('/api/auth', authRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/courses', courseRoutes);
+app.use('/api/archives', archiveRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
