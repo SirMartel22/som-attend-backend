@@ -1,17 +1,27 @@
 const { supabase } = require('../utils/database');
+const { createAttendanceArchive } = require('./archiveController');
 
 const createSession = async (req, res) => {
   try {
-    const { course_id } = req.body;
+    const { course_id, duration_minutes = 60 } = req.body; // Default to 60 minutes (1 hour)
     const adminId = req.adminId;
 
     if (!course_id) {
       return res.status(400).json({ success: false, message: 'Course ID is required' });
     }
 
-    // Create timestamps VERY carefully
+    // Validate duration
+    const validDurations = [1, 5, 10, 15, 30, 45, 60];
+    if (!validDurations.includes(duration_minutes)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid duration. Must be one of: 1, 5, 10, 15, 30, 45, 60 minutes' 
+      });
+    }
+
+    // Create timestamps with custom duration
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 3600000); // Add exactly 1 hour in milliseconds
+    const expiresAt = new Date(now.getTime() + (duration_minutes * 60000)); // Convert minutes to milliseconds
 
     // Format as ISO strings
     const startedAtISO = now.toISOString();
@@ -20,6 +30,7 @@ const createSession = async (req, res) => {
     console.log('Creating session:');
     console.log('  Now:', now);
     console.log('  Now ISO:', startedAtISO);
+    console.log('  Duration:', duration_minutes, 'minutes');
     console.log('  Expires At:', expiresAt);
     console.log('  Expires At ISO:', expiresAtISO);
     console.log('  Difference in ms:', expiresAt.getTime() - now.getTime());
@@ -31,7 +42,8 @@ const createSession = async (req, res) => {
         admin_id: adminId, 
         started_at: startedAtISO, 
         expires_at: expiresAtISO, 
-        status: 'active' 
+        status: 'active',
+        duration_minutes // Store duration for reference
       }])
       .select()
       .single();
@@ -46,9 +58,67 @@ const createSession = async (req, res) => {
   }
 };
 
+// Helper function to automatically close expired sessions
+const closeExpiredSessions = async () => {
+  try {
+    const now = new Date().toISOString();
+    
+    // Find all active sessions that have expired
+    const { data: expiredSessions, error: fetchError } = await supabase
+      .from('attendance_sessions')
+      .select(`
+        *,
+        courses (id, course_code, course_name)
+      `)
+      .eq('status', 'active')
+      .lt('expires_at', now);
+
+    if (fetchError) {
+      console.error('Error fetching expired sessions:', fetchError);
+      return;
+    }
+
+    if (!expiredSessions || expiredSessions.length === 0) {
+      return;
+    }
+
+    console.log(`Found ${expiredSessions.length} expired session(s) to close`);
+
+    // Close each expired session
+    for (const session of expiredSessions) {
+      try {
+        // Get attendance records for this session
+        const { data: records } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('session_id', session.id);
+
+        // Update session status to ended
+        await supabase
+          .from('attendance_sessions')
+          .update({ status: 'ended' })
+          .eq('id', session.id);
+
+        // Create archive
+        await createAttendanceArchive(session.id, session, records || []);
+        
+        console.log(`Automatically closed expired session: ${session.id}`);
+      } catch (sessionError) {
+        console.error(`Failed to close session ${session.id}:`, sessionError);
+      }
+    }
+  } catch (error) {
+    console.error('Error in closeExpiredSessions:', error);
+  }
+};
+
 const getActiveSessions = async (req, res) => {
   try {
     const adminId = req.adminId;
+    
+    // First, close any expired sessions
+    await closeExpiredSessions();
+    
     const { data: sessions, error } = await supabase
       .from('attendance_sessions')
       .select('*')
@@ -71,28 +141,6 @@ const getActiveSessions = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error', error: String(error) });
   }
 };
-
-// const endSession = async (req, res) => {
-//   try {
-//     const { session_id } = req.body;
-//     const { data, error } = await supabase
-//       .from('attendance_sessions')
-//       .update({ status: 'ended' })
-//       .eq('id', session_id)
-//       .select()
-//       .single();
-
-//     if (error) throw error;
-//     res.json({ success: true, message: 'Session ended', data });
-//   } catch (error) {
-//     console.error('End session error:', error);
-//     res.status(500).json({ success: false, message: 'Server error', error: String(error) });
-//   }
-// };
-
-
-
-const { createAttendanceArchive } = require('./archiveController');
 
 const endSession = async (req, res) => {
   try {
@@ -150,10 +198,11 @@ const endSession = async (req, res) => {
   }
 };
 
-
-
 const getPublicActiveSessions = async (req, res) => {
   try {
+    // First, close any expired sessions
+    await closeExpiredSessions();
+
     const now = new Date().toISOString();
     const { data: sessions, error } = await supabase
       .from('attendance_sessions')
@@ -178,5 +227,4 @@ const getPublicActiveSessions = async (req, res) => {
   }
 };
 
-module.exports = { createSession, getActiveSessions, endSession, getPublicActiveSessions };
-// module.exports = { createSession, getActiveSessions, endSession, getPublicActiveSessions };
+module.exports = { createSession, getActiveSessions, endSession, getPublicActiveSessions, closeExpiredSessions };
