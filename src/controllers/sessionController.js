@@ -72,25 +72,6 @@ const getActiveSessions = async (req, res) => {
   }
 };
 
-// const endSession = async (req, res) => {
-//   try {
-//     const { session_id } = req.body;
-//     const { data, error } = await supabase
-//       .from('attendance_sessions')
-//       .update({ status: 'ended' })
-//       .eq('id', session_id)
-//       .select()
-//       .single();
-
-//     if (error) throw error;
-//     res.json({ success: true, message: 'Session ended', data });
-//   } catch (error) {
-//     console.error('End session error:', error);
-//     res.status(500).json({ success: false, message: 'Server error', error: String(error) });
-//   }
-// };
-
-
 
 const { createAttendanceArchive } = require('./archiveController');
 
