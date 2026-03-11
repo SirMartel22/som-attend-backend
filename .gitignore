@@ -34,7 +34,6 @@ build/Release
 
 # Dependency directories
 node_modules/
-.env
 .DS_Store
 src/hashPasswords.js
 dist/
@@ -59,10 +58,10 @@ typings/
 .yarn-integrity
 
 # dotenv environment variables file
-.env
 
 # next.js build output
 .next
 
 
 #unneeded code
+config.bat
