@@ -142,6 +142,12 @@ const getActiveSessions = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
+=======
+
+const { createAttendanceArchive } = require('./archiveController');
+
+>>>>>>> master
 const endSession = async (req, res) => {
   try {
     const { session_id } = req.body;

@@ -1,5 +1,9 @@
 const { supabase } = require('../utils/database');
+<<<<<<< HEAD
 const { closeExpiredSessions } = require('./sessionController');
+=======
+
+>>>>>>> master
 
 const markAttendance = async (req, res) => {
   try {
@@ -34,6 +38,7 @@ const markAttendance = async (req, res) => {
     console.log('  Expires At:', session.expires_at);
     console.log('  Session Status:', session.status);
 
+<<<<<<< HEAD
     // Check if session is active (it should have been closed if expired)
     if (session.status !== 'active') {
       return res.status(400).json({
@@ -41,6 +46,16 @@ const markAttendance = async (req, res) => {
         message: 'Attendance session is not active or has expired',
       });
     }
+=======
+    
+    // Just check status
+if (session.status !== 'active') {
+  return res.status(400).json({
+    success: false,
+    message: 'Attendance session is not active',
+  });
+}
+>>>>>>> master
 
     // Get student
     const { data: student, error: studentError } = await supabase
